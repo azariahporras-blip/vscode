@@ -5,14 +5,14 @@
 
 import assert from 'assert';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../../base/test/common/utils.js';
-import type { CustomizationAgentRef } from '../../../../../../platform/agentHost/common/state/protocol/state.js';
+import { CustomizationType, type CustomizationAgentRef } from '../../../../../../platform/agentHost/common/state/sessionState.js';
 import { agentHostAgentPickerStorageKey, resolveAgentHostAgent } from '../../../../../../platform/agentHost/common/customAgents.js';
 
 suite('agentHostAgentPicker', () => {
 	ensureNoDisposablesAreLeakedInTestSuite();
 
-	const alpha: CustomizationAgentRef = { uri: 'agent://a', name: 'alpha' };
-	const beta: CustomizationAgentRef = { uri: 'agent://b', name: 'beta', description: 'b desc' };
+	const alpha: CustomizationAgentRef = { type: CustomizationType.Agent, id: 'agent://a', uri: 'agent://a', name: 'alpha' };
+	const beta: CustomizationAgentRef = { type: CustomizationType.Agent, id: 'agent://b', uri: 'agent://b', name: 'beta', description: 'b desc' };
 	const agents: readonly CustomizationAgentRef[] = [alpha, beta];
 
 	suite('agentHostAgentPickerStorageKey', () => {

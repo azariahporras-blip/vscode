@@ -20,9 +20,9 @@ import { AgentSession, IAgentConnection, IAgentSessionMetadata } from '../../../
 import { buildSessionChangesetUri, buildUncommittedChangesetUri } from '../../../../../platform/agentHost/common/changesetUri.js';
 import { KNOWN_AUTO_APPROVE_VALUES, SessionConfigKey } from '../../../../../platform/agentHost/common/sessionConfigKeys.js';
 import { ResolveSessionConfigResult } from '../../../../../platform/agentHost/common/state/protocol/commands.js';
-import { AgentSelection, CustomizationAgentRef, ModelSelection, SessionStatus as ProtocolSessionStatus, RootConfigState, RootState, SessionActiveClient, SessionState, SessionSummary, type ChangesetSummary } from '../../../../../platform/agentHost/common/state/protocol/state.js';
+import { AgentSelection, ModelSelection, SessionStatus as ProtocolSessionStatus, RootState, SessionActiveClient, SessionState, SessionSummary, type ChangesetSummary } from '../../../../../platform/agentHost/common/state/protocol/state.js';
 import { ActionType, isSessionAction, NotificationType } from '../../../../../platform/agentHost/common/state/sessionActions.js';
-import { readSessionGitState, ROOT_STATE_URI, SessionMeta, StateComponents, type ChangesetState, type ISessionGitState } from '../../../../../platform/agentHost/common/state/sessionState.js';
+import { readSessionGitState, ROOT_STATE_URI, SessionMeta, StateComponents, type ChangesetState, type CustomizationAgentRef, type ISessionGitState, type RootConfigState } from '../../../../../platform/agentHost/common/state/sessionState.js';
 import type { IAgentSubscription } from '../../../../../platform/agentHost/common/state/agentSubscription.js';
 import { IConfigurationService } from '../../../../../platform/configuration/common/configuration.js';
 import { IInstantiationService } from '../../../../../platform/instantiation/common/instantiation.js';

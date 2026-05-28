@@ -10,7 +10,7 @@ import { URI } from '../../../../../../base/common/uri.js';
 import { hash } from '../../../../../../base/common/hash.js';
 import { IFileService } from '../../../../../../platform/files/common/files.js';
 import { PromptsType } from '../../../common/promptSyntax/promptTypes.js';
-import { type CustomizationRef } from '../../../../../../platform/agentHost/common/state/sessionState.js';
+import { CustomizationType, type CustomizationRef } from '../../../../../../platform/agentHost/common/state/sessionState.js';
 import { type URI as ProtocolURI } from '../../../../../../platform/agentHost/common/state/protocol/state.js';
 import { IAgentHostFileSystemService, SYNCED_CUSTOMIZATION_SCHEME } from '../../../../../../workbench/services/agentHost/common/agentHostFileSystemService.js';
 
@@ -157,9 +157,11 @@ export class SyncedCustomizationBundler extends Disposable {
 
 		return {
 			ref: {
+				type: CustomizationType.Plugin,
+				id: this._rootUri.toString(),
 				uri: this._rootUri.toString() as ProtocolURI,
-				displayName: DISPLAY_NAME,
-				description: `${syncable.length} customization(s) synced from VS Code`,
+				name: DISPLAY_NAME,
+				enabled: true,
 				nonce,
 			},
 		};

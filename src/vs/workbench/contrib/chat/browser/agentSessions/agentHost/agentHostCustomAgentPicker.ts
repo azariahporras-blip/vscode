@@ -20,8 +20,7 @@ import { IAgentHostService } from '../../../../../../platform/agentHost/common/a
 import { agentHostAgentPickerStorageKey, getEffectiveAgents, resolveAgentHostAgent } from '../../../../../../platform/agentHost/common/customAgents.js';
 import { type IAgentSubscription } from '../../../../../../platform/agentHost/common/state/agentSubscription.js';
 import { ActionType } from '../../../../../../platform/agentHost/common/state/protocol/actions.js';
-import type { CustomizationAgentRef, SessionState } from '../../../../../../platform/agentHost/common/state/protocol/state.js';
-import { StateComponents } from '../../../../../../platform/agentHost/common/state/sessionState.js';
+import { StateComponents, type CustomizationAgentRef, type SessionState } from '../../../../../../platform/agentHost/common/state/sessionState.js';
 import { ICommandService } from '../../../../../../platform/commands/common/commands.js';
 import { IContextKeyService } from '../../../../../../platform/contextkey/common/contextkey.js';
 import { ServicesAccessor } from '../../../../../../platform/instantiation/common/instantiation.js';

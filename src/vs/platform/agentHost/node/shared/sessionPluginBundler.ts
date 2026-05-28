@@ -10,7 +10,7 @@ import { basename, dirname } from '../../../../base/common/resources.js';
 import { URI } from '../../../../base/common/uri.js';
 import { IFileService } from '../../../files/common/files.js';
 import { IAgentPluginManager } from '../../common/agentPluginManager.js';
-import type { CustomizationRef } from '../../common/state/sessionState.js';
+import { CustomizationType, type CustomizationRef } from '../../common/state/sessionState.js';
 import type { URI as ProtocolURI } from '../../common/state/protocol/state.js';
 import { DiscoveredType, type IDiscoveredFile } from '../copilot/sessionCustomizationDiscovery.js';
 
@@ -127,9 +127,11 @@ export class SessionPluginBundler extends Disposable {
 
 		return {
 			ref: {
+				type: CustomizationType.Plugin,
+				id: this._rootUri.toString(),
 				uri: this._rootUri.toString() as ProtocolURI,
-				displayName: DISPLAY_NAME,
-				description: `${files.length} customization(s) discovered for this session`,
+				name: DISPLAY_NAME,
+				enabled: true,
 				nonce,
 			},
 		};

@@ -29,10 +29,10 @@ import { AgentSession, AgentSignal, GITHUB_COPILOT_PROTECTED_RESOURCE, IAgent, I
 import { SessionConfigKey } from '../../common/sessionConfigKeys.js';
 import { ISessionDataService, SESSION_DB_FILENAME } from '../../common/sessionDataService.js';
 import type { ResolveSessionConfigResult, SessionConfigCompletionsResult } from '../../common/state/protocol/commands.js';
-import { ProtectedResourceMetadata, type ConfigSchema, type ModelSelection, type AgentSelection, type SessionCustomization, type ToolDefinition } from '../../common/state/protocol/state.js';
+import { ProtectedResourceMetadata, type ConfigSchema, type ModelSelection, type AgentSelection, type ToolDefinition } from '../../common/state/protocol/state.js';
 import { ActionType, type SessionAction } from '../../common/state/sessionActions.js';
 import { AHP_AUTH_REQUIRED, ProtocolError } from '../../common/state/sessionProtocol.js';
-import { CustomizationRef, CustomizationStatus, ResponsePartKind, SessionInputResponseKind, parseSubagentSessionUri, type MessageAttachment, type PendingMessage, type PolicyState, type ResponsePart, type SessionInputAnswer, type ToolCallResult, type Turn } from '../../common/state/sessionState.js';
+import { CustomizationRef, CustomizationStatus, ResponsePartKind, SessionInputResponseKind, parseSubagentSessionUri, type MessageAttachment, type PendingMessage, type PolicyState, type ResponsePart, type SessionCustomization, type SessionInputAnswer, type ToolCallResult, type Turn } from '../../common/state/sessionState.js';
 import { IAgentConfigurationService } from '../agentConfigurationService.js';
 import { IAgentHostOTelService } from '../../common/otel/agentHostOTelService.js';
 import { IAgentHostCompletions } from '../agentHostCompletions.js';
@@ -1900,11 +1900,12 @@ class SessionDiscoveredEntry extends Disposable {
 			const plugin = await this._resolvePlugin(pluginDir);
 			this._resolved = {
 				customization: {
-					customization: bundleResult.ref,
+					...bundleResult.ref,
 					enabled: true,
-					status: plugin ? CustomizationStatus.Loaded : CustomizationStatus.Error,
-					statusMessage: plugin ? undefined : localize('copilotAgent.pluginParseError', "Error parsing plugin."),
-					...(plugin ? { agents: toCustomizationAgentRefs(plugin.agents) } : {}),
+					load: plugin
+						? { kind: CustomizationStatus.Loaded }
+						: { kind: CustomizationStatus.Error, message: localize('copilotAgent.pluginParseError', "Error parsing plugin.") },
+					...(plugin ? { children: toCustomizationAgentRefs(plugin.agents) } : {}),
 				},
 				pluginDir,
 				plugin,
@@ -1961,7 +1962,7 @@ class PluginController extends Disposable {
 	}
 
 	public getConfiguredHostCustomizations(): readonly CustomizationRef[] {
-		return this._hostCustomizations.map(item => item.customization.customization);
+		return this._hostCustomizations.map(item => item.customization as CustomizationRef);
 	}
 
 	public getSessionCustomizations(directory: URI | undefined): readonly SessionCustomization[] {
@@ -2074,9 +2075,9 @@ class PluginController extends Disposable {
 		const revision = ++this._hostRevision;
 		this._hostCustomizations = customizations.map(customization => ({
 			customization: {
-				customization,
+				...customization,
 				enabled: true,
-				status: CustomizationStatus.Loading,
+				load: { kind: CustomizationStatus.Loading },
 			},
 		}));
 		this._onDidChange.fire();
@@ -2096,10 +2097,10 @@ class PluginController extends Disposable {
 		const revision = ++this._clientRevision;
 		this._clientCustomizations = customizations.map(customization => ({
 			customization: {
-				customization,
+				...customization,
 				clientId,
 				enabled: true,
-				status: CustomizationStatus.Loading,
+				load: { kind: CustomizationStatus.Loading },
 			},
 		}));
 		publish?.({
@@ -2109,21 +2110,17 @@ class PluginController extends Disposable {
 		const published = new Map<string, SessionCustomization>();
 		for (const customization of this._clientCustomizations) {
 			const enabled = this._applyEnablement(customization.customization);
-			published.set(enabled.customization.uri, this._applyEnablement(customization.customization));
+			published.set(enabled.uri, this._applyEnablement(customization.customization));
 		}
 		const publishUpdate = (item: IResolvedCustomization) => {
 			const customization = this._applyEnablement(item.customization);
-			if (equals(published.get(customization.customization.uri), customization)) {
+			if (equals(published.get(customization.uri), customization)) {
 				return;
 			}
-			published.set(customization.customization.uri, { ...customization });
+			published.set(customization.uri, { ...customization });
 			publish?.({
 				type: ActionType.SessionCustomizationUpdated,
-				customization: customization.customization,
-				enabled: customization.enabled,
-				status: customization.status,
-				statusMessage: customization.statusMessage,
-				agents: customization.agents,
+				customization,
 			});
 		};
 
@@ -2156,7 +2153,7 @@ class PluginController extends Disposable {
 	}
 
 	private _isEnabled(customization: SessionCustomization): boolean {
-		return this._enablement.get(customization.customization.uri) ?? customization.enabled;
+		return this._enablement.get(customization.uri) ?? customization.enabled;
 	}
 
 	private _applyEnablement(customization: SessionCustomization): SessionCustomization {
@@ -2170,20 +2167,19 @@ class PluginController extends Disposable {
 		if (!parsed) {
 			return {
 				customization: {
-					customization,
+					...customization,
 					enabled: true,
-					status: CustomizationStatus.Error,
-					statusMessage: localize('copilotAgent.pluginParseError', "Error parsing plugin."),
+					load: { kind: CustomizationStatus.Error, message: localize('copilotAgent.pluginParseError', "Error parsing plugin.") },
 				},
 			};
 		}
 
 		return {
 			customization: {
-				customization,
+				...customization,
 				enabled: true,
-				status: CustomizationStatus.Loaded,
-				agents: toCustomizationAgentRefs(parsed.agents),
+				load: { kind: CustomizationStatus.Loaded },
+				children: toCustomizationAgentRefs(parsed.agents),
 			},
 			pluginDir,
 			plugin: parsed,
@@ -2206,8 +2202,7 @@ class PluginController extends Disposable {
 				customization: {
 					...item.customization,
 					clientId,
-					status: CustomizationStatus.Error,
-					statusMessage: localize('copilotAgent.pluginParseError', "Error parsing plugin."),
+					load: { kind: CustomizationStatus.Error, message: localize('copilotAgent.pluginParseError', "Error parsing plugin.") },
 				},
 			};
 		}
@@ -2215,9 +2210,8 @@ class PluginController extends Disposable {
 		return {
 			customization: {
 				...item.customization,
-				customization: item.customization.customization,
 				clientId,
-				agents: toCustomizationAgentRefs(parsed.agents),
+				children: toCustomizationAgentRefs(parsed.agents),
 			},
 			pluginDir: item.pluginDir,
 			plugin: parsed,

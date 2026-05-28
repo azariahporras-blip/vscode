@@ -29,7 +29,7 @@ import { IAgentPluginManager, ISyncedCustomization } from '../../common/agentPlu
 import { AgentSession, type AgentSignal, type IAgentActionSignal, type IAgentSessionMetadata } from '../../common/agentService.js';
 import { ISessionDataService } from '../../common/sessionDataService.js';
 import { AHP_AUTH_REQUIRED, ProtocolError } from '../../common/state/sessionProtocol.js';
-import { buildSubagentSessionUri, CustomizationStatus, ResponsePartKind, SessionCustomization, ToolCallConfirmationReason, ToolCallStatus, TurnState, type CustomizationRef, type MarkdownResponsePart, type ToolCallResult, type Turn } from '../../common/state/sessionState.js';
+import { buildSubagentSessionUri, CustomizationStatus, CustomizationType, MessageKind, ResponsePartKind, SessionCustomization, ToolCallConfirmationReason, ToolCallStatus, TurnState, type CustomizationRef, type MarkdownResponsePart, type ToolCallResult, type Turn } from '../../common/state/sessionState.js';
 import { ActionType, type IDeltaAction, type SessionAction } from '../../common/state/sessionActions.js';
 
 import { AgentConfigurationService, IAgentConfigurationService } from '../../node/agentConfigurationService.js';
@@ -393,6 +393,10 @@ async function disposeAgent(agent: CopilotAgent): Promise<void> {
 }
 
 suite('CopilotAgent', () => {
+
+	function pluginCustomization(uri: string, name: string): CustomizationRef {
+		return { type: CustomizationType.Plugin, id: uri, uri, name, enabled: true };
+	}
 	const disposables = ensureNoDisposablesAreLeakedInTestSuite();
 
 	test('uses the Copilot CLI sibling worktrees root convention', () => {
@@ -629,7 +633,7 @@ suite('CopilotAgent', () => {
 			try {
 				await agent.authenticate('https://api.github.com', 'token');
 
-				const customizations: CustomizationRef[] = [{ uri: 'file:///plugin-a', displayName: 'Plugin A' }];
+				const customizations: CustomizationRef[] = [pluginCustomization('file:///plugin-a', 'Plugin A')];
 				const result = await agent.createSession({
 					session: AgentSession.uri('copilotcli', 'test-session'),
 					workingDirectory: URI.file('/workspace'),
@@ -683,7 +687,7 @@ suite('CopilotAgent', () => {
 			class PluginDirSpyManager extends TestAgentPluginManager {
 				override async syncCustomizations(_clientId: string, customizations: CustomizationRef[]): Promise<ISyncedCustomization[]> {
 					return customizations.map(c => ({
-						customization: { customization: c, enabled: true, status: CustomizationStatus.Loaded },
+						customization: { ...c, load: { kind: CustomizationStatus.Loaded } },
 						pluginDir,
 					}));
 				}
@@ -705,7 +709,7 @@ suite('CopilotAgent', () => {
 				await agent.authenticate('https://api.github.com', 'token');
 
 				const session = AgentSession.uri('copilotcli', 'sync-customizations-test');
-				await agent.setClientCustomizations(session, 'client-1', [{ uri: pluginDir.toString(), displayName: 'Plugin A' }]);
+				await agent.setClientCustomizations(session, 'client-1', [pluginCustomization(pluginDir.toString(), 'Plugin A')]);
 
 				// Wait for the deferred resolution chain in PluginController.sync.
 				await new Promise(r => setTimeout(r, 50));
@@ -713,10 +717,12 @@ suite('CopilotAgent', () => {
 				const updatesWithAgents = actions
 					.filter(a => a.type === ActionType.SessionCustomizationUpdated)
 					.filter((a): a is Extract<SessionAction, { type: ActionType.SessionCustomizationUpdated }> => true)
-					.filter(a => a.agents !== undefined);
+					.filter(a => a.customization.children?.length);
 
 				assert.strictEqual(updatesWithAgents.length > 0, true, 'expected SessionCustomizationUpdated to carry parsed agents');
-				assert.deepStrictEqual(updatesWithAgents.at(-1)!.agents, [{
+				assert.deepStrictEqual(updatesWithAgents.at(-1)!.customization.children, [{
+					type: CustomizationType.Agent,
+					id: URI.joinPath(pluginDir, 'agents', 'helper.md').toString(),
 					uri: URI.joinPath(pluginDir, 'agents', 'helper.md').toString(),
 					name: 'helper-agent',
 					description: 'helps out',
@@ -981,7 +987,7 @@ suite('CopilotAgent', () => {
 			const fakeMessages: Turn[] = [
 				{
 					id: 'u1',
-					userMessage: { text: 'hi' },
+					message: { text: 'hi', origin: { kind: MessageKind.User } },
 					responseParts: [
 						{
 							kind: ResponsePartKind.ToolCall,
@@ -1093,7 +1099,7 @@ suite('CopilotAgent', () => {
 			}) as TestableCopilotAgent;
 
 			const fakeMessages: Turn[] = [
-				{ id: 'u1', userMessage: { text: 'hi' }, responseParts: [{ kind: ResponsePartKind.Markdown, id: 'a1', content: 'untouched reply' }], usage: undefined, state: TurnState.Complete },
+				{ id: 'u1', message: { text: 'hi', origin: { kind: MessageKind.User } }, responseParts: [{ kind: ResponsePartKind.Markdown, id: 'a1', content: 'untouched reply' }], usage: undefined, state: TurnState.Complete },
 			];
 			agent.registerFakeSession(sessionId, {
 				send: async () => { },

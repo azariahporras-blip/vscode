@@ -77,13 +77,13 @@ export class AgentPluginManager implements IAgentPluginManager {
 			this._sequencer.queue(ref.uri, async (): Promise<ISyncedCustomization> => {
 				try {
 					const pluginDir = await this._syncPlugin(clientId, ref);
-					const customization = { customization: ref, enabled: true, status: CustomizationStatus.Loaded };
+					const customization: SessionCustomization = { ...ref, clientId, enabled: true, load: { kind: CustomizationStatus.Loaded } };
 					progress?.(customization);
 					return { customization, pluginDir };
 				} catch (err) {
 					const message = err instanceof Error ? err.message : String(err);
 					this._logService.error(`[AgentPluginManager] Failed to sync plugin ${ref.uri}: ${message}`);
-					const customization = { customization: ref, enabled: true, status: CustomizationStatus.Error, statusMessage: message };
+					const customization: SessionCustomization = { ...ref, clientId, enabled: true, load: { kind: CustomizationStatus.Error, message } };
 					progress?.(customization);
 					return { customization };
 				}

@@ -84,7 +84,7 @@ suite('resolveCustomizationRefs - built-in skills', () => {
 			{ uri: builtin.toString(), type: PromptsType.skill },
 		]);
 		assert.strictEqual(refs.length, 1);
-		assert.strictEqual(refs[0].displayName, 'Open Plugin');
+		assert.strictEqual(refs[0].name, 'Open Plugin');
 	});
 
 	test('omits disabled built-in skills from the bundle', async () => {

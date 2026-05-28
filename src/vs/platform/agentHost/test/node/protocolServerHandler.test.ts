@@ -16,7 +16,7 @@ import { CompletionsParams, CompletionsResult, ListSessionsResult, ResourceReadR
 import { ActionType, type IRootConfigChangedAction, type SessionAction, type TerminalAction } from '../../common/state/sessionActions.js';
 import { PROTOCOL_VERSION } from '../../common/state/protocol/version/registry.js';
 import { isJsonRpcNotification, isJsonRpcRequest, isJsonRpcResponse, JSON_RPC_INTERNAL_ERROR, ProtocolError, AHP_UNSUPPORTED_PROTOCOL_VERSION, type AhpNotification, type InitializeResult, type ProtocolMessage, type ReconnectResult, type ResourceListResult, type ResourceWriteParams, type ResourceWriteResult, type IStateSnapshot } from '../../common/state/sessionProtocol.js';
-import { ResponsePartKind, SessionStatus, ChangesetStatus, ToolCallConfirmationReason, ToolCallStatus, ToolResultContentType, type SessionSummary } from '../../common/state/sessionState.js';
+import { MessageKind, ResponsePartKind, SessionStatus, ChangesetStatus, ToolCallConfirmationReason, ToolCallStatus, ToolResultContentType, type SessionSummary } from '../../common/state/sessionState.js';
 import type { SessionAddedParams } from '../../common/state/protocol/notifications.js';
 import type { IProtocolServer, IProtocolTransport } from '../../common/state/sessionTransport.js';
 import { ProtocolServerHandler } from '../../node/protocolServerHandler.js';
@@ -398,7 +398,7 @@ suite('ProtocolServerHandler', () => {
 			action: {
 				type: ActionType.SessionTurnStarted,
 				turnId: 'turn-1',
-				userMessage: { text: 'hello' },
+				message: { text: 'hello', origin: { kind: MessageKind.User } },
 			},
 		}));
 
@@ -808,7 +808,7 @@ suite('ProtocolServerHandler', () => {
 			stateManager.dispatchServerAction(sessionUri, {
 				type: ActionType.SessionTurnStarted,
 				turnId: 'turn-1',
-				userMessage: { text: 'run it' },
+				message: { text: 'run it', origin: { kind: MessageKind.User } },
 			});
 			stateManager.dispatchServerAction(sessionUri, {
 				type: ActionType.SessionToolCallStart,
@@ -865,7 +865,7 @@ suite('ProtocolServerHandler', () => {
 			stateManager.dispatchServerAction(sessionUri, {
 				type: ActionType.SessionTurnStarted,
 				turnId: 'turn-1',
-				userMessage: { text: 'run it' },
+				message: { text: 'run it', origin: { kind: MessageKind.User } },
 			});
 			stateManager.dispatchServerAction(sessionUri, {
 				type: ActionType.SessionToolCallStart,
@@ -913,7 +913,7 @@ suite('ProtocolServerHandler', () => {
 			stateManager.dispatchServerAction(sessionUri, {
 				type: ActionType.SessionTurnStarted,
 				turnId: 'turn-1',
-				userMessage: { text: 'run it' },
+				message: { text: 'run it', origin: { kind: MessageKind.User } },
 			});
 			stateManager.dispatchServerAction(sessionUri, {
 				type: ActionType.SessionToolCallStart,
@@ -971,7 +971,7 @@ suite('ProtocolServerHandler', () => {
 			stateManager.dispatchServerAction(sessionUri, {
 				type: ActionType.SessionTurnStarted,
 				turnId: 'turn-1',
-				userMessage: { text: 'run it' },
+				message: { text: 'run it', origin: { kind: MessageKind.User } },
 			});
 			stateManager.dispatchServerAction(sessionUri, {
 				type: ActionType.SessionToolCallStart,
@@ -1023,7 +1023,7 @@ suite('ProtocolServerHandler', () => {
 			stateManager.dispatchServerAction(sessionUri, {
 				type: ActionType.SessionTurnStarted,
 				turnId: 'turn-1',
-				userMessage: { text: 'run it' },
+				message: { text: 'run it', origin: { kind: MessageKind.User } },
 			});
 			stateManager.dispatchServerAction(sessionUri, {
 				type: ActionType.SessionToolCallStart,

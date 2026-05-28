@@ -172,11 +172,7 @@ export class MockAgent implements IAgent {
 	async setClientCustomizations(session: URI, clientId: string, customizations: CustomizationRef[]): Promise<ISyncedCustomization[]> {
 		this.setClientCustomizationsCalls.push({ clientId, customizations });
 		const results: ISyncedCustomization[] = customizations.map(c => ({
-			customization: {
-				customization: c,
-				enabled: true,
-				status: CustomizationStatus.Loaded,
-			},
+			customization: { ...c, load: { kind: CustomizationStatus.Loaded } },
 		}));
 		this._onDidSessionProgress.fire({
 			kind: 'action',

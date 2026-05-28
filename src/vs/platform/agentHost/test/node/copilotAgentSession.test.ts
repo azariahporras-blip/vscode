@@ -24,7 +24,7 @@ import { AgentSession, type AgentSignal, type IAgentActionSignal, type IAgentToo
 import { IDiffComputeService } from '../../common/diffComputeService.js';
 import { ISessionDataService } from '../../common/sessionDataService.js';
 import { ActionType, type SessionDeltaAction, type SessionErrorAction, type SessionInputRequestedAction, type SessionResponsePartAction, type SessionToolCallCompleteAction, type SessionToolCallReadyAction, type SessionToolCallStartAction } from '../../common/state/sessionActions.js';
-import { MessageAttachmentKind, ResponsePartKind, SessionInputAnswerState, SessionInputAnswerValueKind, SessionInputQuestionKind, SessionInputResponseKind, ToolCallStatus, ToolResultContentType, type ToolResultFileEditContent } from '../../common/state/sessionState.js';
+import { MessageAttachmentKind, MessageKind, ResponsePartKind, SessionInputAnswerState, SessionInputAnswerValueKind, SessionInputQuestionKind, SessionInputResponseKind, ToolCallStatus, ToolResultContentType, type ToolResultFileEditContent } from '../../common/state/sessionState.js';
 import { CopilotAgentSession, IActiveClientSnapshot, SessionWrapperFactory } from '../../node/copilot/copilotAgentSession.js';
 import { CopilotSessionWrapper } from '../../node/copilot/copilotSessionWrapper.js';
 import { buildCopilotSystemNotification } from '../../node/copilot/copilotSystemNotification.js';
@@ -391,8 +391,9 @@ suite('CopilotAgentSession', () => {
 
 		assert.deepStrictEqual(await session.getMessages(), [{
 			id: 'message-1',
-			userMessage: {
+			message: {
 				text: '/act-on-feedback',
+				origin: { kind: MessageKind.User },
 				attachments: [expectedAttachment],
 			},
 			responseParts: [],
@@ -898,7 +899,7 @@ suite('CopilotAgentSession', () => {
 			const { session, mockSession, signals } = await createAgentSession(disposables);
 			session.resetTurnState('turn-original');
 
-			await session.sendSteering({ id: 'steer-1', userMessage: { text: 'focus on tests' } });
+			await session.sendSteering({ id: 'steer-1', message: { text: 'focus on tests', origin: { kind: MessageKind.User } } });
 
 			// Sending the steering must not flip turns until the SDK has
 			// echoed the user message back through the event stream.
@@ -916,7 +917,7 @@ suite('CopilotAgentSession', () => {
 			assert.strictEqual(turnComplete.turnId, 'turn-original');
 			assert.ok(turnStarted, 'should start a new turn for the steering message');
 			assert.notStrictEqual(turnStarted.turnId, 'turn-original');
-			assert.deepStrictEqual(turnStarted.userMessage, { text: 'focus on tests' });
+			assert.deepStrictEqual(turnStarted.message, { text: 'focus on tests', origin: { kind: MessageKind.User } });
 			assert.strictEqual(turnStarted.queuedMessageId, 'steer-1');
 		});
 
@@ -924,7 +925,7 @@ suite('CopilotAgentSession', () => {
 			const { session, mockSession, signals } = await createAgentSession(disposables);
 			session.resetTurnState('turn-original');
 
-			await session.sendSteering({ id: 'steer-1', userMessage: { text: 'focus on tests' } });
+			await session.sendSteering({ id: 'steer-1', message: { text: 'focus on tests', origin: { kind: MessageKind.User } } });
 			mockSession.fire('user.message', {
 				content: 'focus on tests',
 				interactionId: 'interaction-steer',
@@ -951,7 +952,7 @@ suite('CopilotAgentSession', () => {
 			const { session, mockSession, signals } = await createAgentSession(disposables);
 			session.resetTurnState('turn-original');
 
-			await session.sendSteering({ id: 'steer-1', userMessage: { text: 'focus on tests' } });
+			await session.sendSteering({ id: 'steer-1', message: { text: 'focus on tests', origin: { kind: MessageKind.User } } });
 
 			// SDK injects an unrelated user.message (e.g. skill content)
 			// with the steering's exact text but a non-'user' source.
@@ -970,7 +971,7 @@ suite('CopilotAgentSession', () => {
 			const { session, mockSession, signals } = await createAgentSession(disposables);
 			session.resetTurnState('turn-original');
 
-			await session.sendSteering({ id: 'steer-1', userMessage: { text: 'focus on tests' } });
+			await session.sendSteering({ id: 'steer-1', message: { text: 'focus on tests', origin: { kind: MessageKind.User } } });
 			mockSession.fire('user.message', {
 				content: 'something completely different',
 			} as SessionEventPayload<'user.message'>['data']);
@@ -982,8 +983,8 @@ suite('CopilotAgentSession', () => {
 		test('does not send the same steering message again before it is flipped', async () => {
 			const { session, mockSession } = await createAgentSession(disposables);
 
-			await session.sendSteering({ id: 'steer-1', userMessage: { text: 'focus on tests' } });
-			await session.sendSteering({ id: 'steer-1', userMessage: { text: 'focus on tests' } });
+			await session.sendSteering({ id: 'steer-1', message: { text: 'focus on tests', origin: { kind: MessageKind.User } } });
+			await session.sendSteering({ id: 'steer-1', message: { text: 'focus on tests', origin: { kind: MessageKind.User } } });
 
 			assert.strictEqual(mockSession.sendRequests.length, 1);
 		});
@@ -991,7 +992,7 @@ suite('CopilotAgentSession', () => {
 		test('fires steering_consumed on abort when the steering never reached its turn', async () => {
 			const { session, signals } = await createAgentSession(disposables);
 
-			await session.sendSteering({ id: 'steer-1', userMessage: { text: 'focus on tests' } });
+			await session.sendSteering({ id: 'steer-1', message: { text: 'focus on tests', origin: { kind: MessageKind.User } } });
 			await session.abort();
 
 			const consumed = signals.find(s => s.kind === 'steering_consumed');
@@ -1004,7 +1005,7 @@ suite('CopilotAgentSession', () => {
 
 			mockSession.send = async () => { throw new Error('send failed'); };
 
-			await session.sendSteering({ id: 'steer-fail', userMessage: { text: 'will fail' } });
+			await session.sendSteering({ id: 'steer-fail', message: { text: 'will fail', origin: { kind: MessageKind.User } } });
 
 			const consumed = signals.find(s => s.kind === 'steering_consumed');
 			const turnStarted = signals.find(s => s.kind === 'action' && (s as IAgentActionSignal).action.type === ActionType.SessionTurnStarted);
@@ -1032,8 +1033,8 @@ suite('CopilotAgentSession', () => {
 					kind: { type: 'shell_completed', shellId: 'shell-a', exitCode: 0, description: 'sleep 6' },
 				},
 			}), {
-				message: 'Shell done',
-				label: '`sleep 6` completed',
+				content: 'Shell done',
+				messageText: '`sleep 6` completed',
 			});
 
 			assert.deepStrictEqual(buildCopilotSystemNotification({
@@ -1043,8 +1044,8 @@ suite('CopilotAgentSession', () => {
 					kind: { type: 'shell_detached_completed', shellId: 'detached-a' },
 				},
 			}), {
-				message: 'Detached done',
-				label: 'Shell `detached-a` completed',
+				content: 'Detached done',
+				messageText: 'Shell `detached-a` completed',
 			});
 
 			assert.deepStrictEqual(buildCopilotSystemNotification({
@@ -1054,8 +1055,8 @@ suite('CopilotAgentSession', () => {
 					kind: { type: 'agent_completed', agentId: 'agent-a', agentType: 'task', status: 'completed' },
 				},
 			}), {
-				message: 'Agent done',
-				label: 'Background agent completed',
+				content: 'Agent done',
+				messageText: 'Background agent completed',
 			});
 
 			assert.strictEqual(buildCopilotSystemNotification({
@@ -1079,8 +1080,7 @@ suite('CopilotAgentSession', () => {
 			const actions = getActions(signals);
 			const turnStarted = actions.find(a => a.type === ActionType.SessionTurnStarted);
 			assert.ok(turnStarted, 'should synthesize a fresh turn');
-			assert.strictEqual(turnStarted.userMessage.text, 'Shell command completed');
-			assert.strictEqual(turnStarted.systemInitiatedLabel, '`sleep 6` completed');
+			assert.deepStrictEqual(turnStarted.message, { text: '`sleep 6` completed', origin: { kind: MessageKind.SystemNotification } });
 		});
 
 		test('routes subsequent SDK events into the generated system turn', async () => {
@@ -1689,11 +1689,11 @@ suite('CopilotAgentSession', () => {
 							parts.push({ kind: part.kind });
 					}
 				}
-				return { userMessage: turn.userMessage.text, parts };
+				return { message: turn.message.text, parts };
 			});
 
 			assert.deepStrictEqual(actual, [{
-				userMessage: 'inspect the workspace',
+				message: 'inspect the workspace',
 				parts: [
 					{ kind: ResponsePartKind.Markdown, content: 'I will inspect the workspace.' },
 					{ kind: ResponsePartKind.ToolCall, toolCallId: 'tc-view', toolName: 'view', status: ToolCallStatus.Completed, success: true, content: undefined },

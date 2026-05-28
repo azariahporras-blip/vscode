@@ -31,7 +31,7 @@ import { SessionConfigKey } from '../../common/sessionConfigKeys.js';
 import { ISessionDatabase, ISessionDataService, SESSION_ATTACHMENTS_DIRNAME } from '../../common/sessionDataService.js';
 import { MessageAttachmentKind, type AgentSelection, type FileEdit, type MessageAttachment, type ToolDefinition } from '../../common/state/protocol/state.js';
 import { ActionType, type SessionAction } from '../../common/state/sessionActions.js';
-import { ResponsePartKind, SessionInputAnswerState, SessionInputAnswerValueKind, SessionInputQuestionKind, SessionInputResponseKind, ToolCallConfirmationReason, ToolCallStatus, ToolResultContentType, type PendingMessage, type SessionInputAnswer, type SessionInputOption, type SessionInputQuestion, type SessionInputRequest, type ToolCallResult, type ToolResultContent, type Turn, type UsageInfo } from '../../common/state/sessionState.js';
+import { MessageKind, ResponsePartKind, SessionInputAnswerState, SessionInputAnswerValueKind, SessionInputQuestionKind, SessionInputResponseKind, ToolCallConfirmationReason, ToolCallStatus, ToolResultContentType, type PendingMessage, type SessionInputAnswer, type SessionInputOption, type SessionInputQuestion, type SessionInputRequest, type ToolCallResult, type ToolResultContent, type Turn, type UsageInfo } from '../../common/state/sessionState.js';
 import { IAgentConfigurationService } from '../agentConfigurationService.js';
 import type { IExitPlanModeRequestParams, IExitPlanModeResponse } from './copilotAgent.js';
 import { CopilotSessionWrapper } from './copilotSessionWrapper.js';
@@ -358,7 +358,7 @@ export class CopilotAgentSession extends Disposable {
 	 * echoes a steering through a `user.message` event whose `content`
 	 * matches one of these entries, we finalize the in-flight turn and
 	 * dispatch a new {@link ActionType.SessionTurnStarted} whose
-	 * `userMessage` is the steering content. The reducer also removes
+	 * `message` is the steering content. The reducer also removes
 	 * the pending steering via the action's `queuedMessageId`.
 	 *
 	 * Entries left here at abort/dispose time are flushed as
@@ -474,7 +474,7 @@ export class CopilotAgentSession extends Disposable {
 	 * Promotes a pending steering message into its own protocol turn:
 	 * closes the in-flight turn (so its responseParts settle into history)
 	 * and dispatches {@link ActionType.SessionTurnStarted} for a fresh
-	 * turn whose user message is the steering content. The action's
+	 * turn whose message is the steering content. The action's
 	 * `queuedMessageId` atomically clears the corresponding pending
 	 * steering message from the session state.
 	 *
@@ -499,7 +499,7 @@ export class CopilotAgentSession extends Disposable {
 		this._emitAction({
 			type: ActionType.SessionTurnStarted,
 			turnId: newTurnId,
-			userMessage: steering.userMessage,
+			message: steering.message,
 			queuedMessageId: steering.id,
 		});
 		// Mirror `resetTurnState` so per-turn counters/mappings (usage
@@ -544,7 +544,7 @@ export class CopilotAgentSession extends Disposable {
 			return undefined;
 		}
 		for (const [id, msg] of this._pendingSteeringFlips) {
-			if (msg.userMessage.text === content) {
+			if (msg.message.text === content) {
 				this._pendingSteeringFlips.delete(id);
 				return msg;
 			}
@@ -919,10 +919,10 @@ export class CopilotAgentSession extends Disposable {
 			return;
 		}
 		this._steeringMessagesInFlight.add(steeringMessage.id);
-		this._logService.info(`[Copilot:${this.sessionId}] Sending steering message: "${steeringMessage.userMessage.text.substring(0, 100)}"`);
+		this._logService.info(`[Copilot:${this.sessionId}] Sending steering message: "${steeringMessage.message.text.substring(0, 100)}"`);
 		try {
 			await this._wrapper.session.send({
-				prompt: steeringMessage.userMessage.text,
+				prompt: steeringMessage.message.text,
 				mode: 'immediate',
 			});
 			this._pendingSteeringFlips.set(steeringMessage.id, steeringMessage);
@@ -1605,7 +1605,7 @@ export class CopilotAgentSession extends Disposable {
 					turnId: this._turnId,
 					part: {
 						kind: ResponsePartKind.SystemNotification,
-						content: notification.message,
+						content: notification.content,
 					},
 				});
 				return;
@@ -1616,9 +1616,9 @@ export class CopilotAgentSession extends Disposable {
 			this._emitAction({
 				type: ActionType.SessionTurnStarted,
 				turnId,
-				systemInitiatedLabel: notification.label,
-				userMessage: {
-					text: notification.message,
+				message: {
+					text: notification.messageText,
+					origin: { kind: MessageKind.SystemNotification },
 				},
 			});
 		}));

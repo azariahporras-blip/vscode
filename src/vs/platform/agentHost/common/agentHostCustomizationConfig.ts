@@ -5,7 +5,7 @@
 
 import { localize } from '../../../nls.js';
 import { createSchema, schemaProperty } from './agentHostSchema.js';
-import { type CustomizationRef } from './state/protocol/state.js';
+import { CustomizationType, type CustomizationRef } from './state/sessionState.js';
 
 /**
  * Well-known root-config keys used by the platform to configure agent-host
@@ -37,16 +37,12 @@ export const agentHostCustomizationConfigSchema = createSchema({
 					type: 'string',
 					title: localize('agentHost.config.customizations.uri', "Plugin URI"),
 				},
-				displayName: {
+				name: {
 					type: 'string',
 					title: localize('agentHost.config.customizations.displayName', "Name"),
 				},
-				description: {
-					type: 'string',
-					title: localize('agentHost.config.customizations.descriptionField', "Description"),
-				},
 			},
-			required: ['uri', 'displayName'],
+			required: ['uri', 'name'],
 		},
 	}),
 	[AgentHostConfigKey.DefaultShell]: schemaProperty<string>({
@@ -68,7 +64,15 @@ export const defaultAgentHostCustomizationConfigValues = {
 
 export function getAgentHostConfiguredCustomizations(values: Record<string, unknown> | undefined): readonly CustomizationRef[] {
 	const raw = values?.[AgentHostConfigKey.Customizations];
-	return agentHostCustomizationConfigSchema.validate(AgentHostConfigKey.Customizations, raw)
-		? raw
-		: defaultAgentHostCustomizationConfigValues[AgentHostConfigKey.Customizations];
+	if (!agentHostCustomizationConfigSchema.validate(AgentHostConfigKey.Customizations, raw)) {
+		return defaultAgentHostCustomizationConfigValues[AgentHostConfigKey.Customizations];
+	}
+	return raw.map(customization => ({
+		type: CustomizationType.Plugin,
+		id: customization.id ?? customization.uri,
+		uri: customization.uri,
+		name: customization.name,
+		enabled: customization.enabled ?? true,
+		...(customization.nonce !== undefined ? { nonce: customization.nonce } : {}),
+	}));
 }

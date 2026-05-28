@@ -8,11 +8,11 @@ import { escapeMarkdownLinkLabel, IMarkdownString, MarkdownString } from '../../
 import { marked, type Token, type Tokens, type TokensList } from '../../../../../../base/common/marked/marked.js';
 import { URI } from '../../../../../../base/common/uri.js';
 import { generateUuid } from '../../../../../../base/common/uuid.js';
-import { ToolCallStatus, TurnState, ResponsePartKind, getToolFileEdits, getToolOutputText, getToolSubagentContent, type ActiveTurn, type ICompletedToolCall, type ToolCallState, type Turn, FileEditKind, ToolResultContentType, type ToolResultContent, type UsageInfo } from '../../../../../../platform/agentHost/common/state/sessionState.js';
+import { MessageKind, ToolCallStatus, TurnState, ResponsePartKind, getToolFileEdits, getToolOutputText, getToolSubagentContent, type ActiveTurn, type ICompletedToolCall, type Message, type ToolCallState, type Turn, FileEditKind, ToolResultContentType, type ToolResultContent, type UsageInfo } from '../../../../../../platform/agentHost/common/state/sessionState.js';
 import { getToolKind } from '../../../../../../platform/agentHost/common/state/sessionReducers.js';
 import { AGENT_HOST_SCHEME, toAgentHostUri } from '../../../../../../platform/agentHost/common/agentHostUri.js';
 import { getAgentFeedbackAttachmentMetadata, isAgentFeedbackAttachment } from '../../../../../../platform/agentHost/common/agentFeedbackAttachments.js';
-import { MessageAttachmentKind, type FileEdit, type MessageAttachment, type StringOrMarkdown, type TextRange, type UserMessage } from '../../../../../../platform/agentHost/common/state/protocol/state.js';
+import { MessageAttachmentKind, type FileEdit, type MessageAttachment, type StringOrMarkdown, type TextRange } from '../../../../../../platform/agentHost/common/state/protocol/state.js';
 import { type ChatExternalEditKind, type IChatExternalEdit, type IChatModifiedFilesConfirmationData, type IChatProgress, type IChatSearchToolInvocationData, type IChatTerminalToolInvocationData, type IChatToolInputInvocationData, type IChatToolInvocationSerialized, type IChatUsage, ToolConfirmKind } from '../../../common/chatService/chatService.js';
 import { type IChatSessionHistoryItem } from '../../../common/chatSessionsService.js';
 import { ChatToolInvocation } from '../../../common/model/chatProgressTypes/chatToolInvocation.js';
@@ -150,17 +150,17 @@ export function turnsToHistory(backendSession: URI, turns: readonly Turn[], part
 		const details = lookup?.toResponseDetails(rawModelId, turn.usage);
 
 		// Request
-		const variableData = userMessageToVariableData(turn.userMessage, connectionAuthority);
+		const variableData = messageToVariableData(turn.message, connectionAuthority);
+		const isSystemInitiated = turn.message.origin.kind === MessageKind.SystemNotification;
 		history.push({
 			id: turn.id,
 			type: 'request',
-			prompt: turn.userMessage.text,
+			prompt: turn.message.text,
 			participant: participantId,
 			modelId,
 			variableData,
-			...(turn.systemInitiatedLabel ? {
+			...(isSystemInitiated ? {
 				isSystemInitiated: true,
-				systemInitiatedLabel: turn.systemInitiatedLabel,
 			} : {}),
 		});
 
@@ -220,13 +220,13 @@ export function turnsToHistory(backendSession: URI, turns: readonly Turn[], part
 }
 
 /**
- * Converts a turn's persisted {@link UserMessage} into the chat-layer
+ * Converts a turn's persisted {@link Message} into the chat-layer
  * {@link IChatRequestVariableData} shape so attachments survive a
  * history replay (and pending/server-initiated turn synthesis). Returns
  * `undefined` when the message has no convertible attachments.
  */
-export function userMessageToVariableData(userMessage: UserMessage, connectionAuthority: string): IChatRequestVariableData | undefined {
-	return messageAttachmentsToVariableData(userMessage.attachments, connectionAuthority);
+export function messageToVariableData(message: Message, connectionAuthority: string): IChatRequestVariableData | undefined {
+	return messageAttachmentsToVariableData(message.attachments, connectionAuthority);
 }
 
 export function messageAttachmentsToVariableData(attachments: readonly MessageAttachment[] | undefined, connectionAuthority: string): IChatRequestVariableData | undefined {

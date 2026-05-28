@@ -28,7 +28,7 @@ import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase 
 import { ChatContextKeyExprs } from '../../../../../workbench/contrib/chat/common/actions/chatContextKeys.js';
 import { AICustomizationManagementCommands } from '../../../../../workbench/contrib/chat/browser/aiCustomization/aiCustomizationManagement.js';
 import { AICustomizationManagementSection } from '../../../../../workbench/contrib/chat/common/aiCustomizationWorkspaceService.js';
-import type { CustomizationAgentRef } from '../../../../../platform/agentHost/common/state/protocol/state.js';
+import type { CustomizationAgentRef } from '../../../../../platform/agentHost/common/state/sessionState.js';
 import { type IChatInputPickerOptions, ChatInputPickerActionViewItem } from '../../../../../workbench/contrib/chat/browser/widget/input/chatInputPickerActionItem.js';
 import { Menus } from '../../../../browser/menus.js';
 import { IAgentHostSessionsProvider, isAgentHostProvider, LOCAL_AGENT_HOST_PROVIDER_ID, REMOTE_AGENT_HOST_PROVIDER_RE } from '../../../../common/agentHostSessionsProvider.js';
@@ -189,7 +189,7 @@ class AgentHostAgentPickerActionItem extends ChatInputPickerActionViewItem {
 				category: customCategory,
 				toolbarActions,
 				run: async () => {
-					this.delegate.setAgent({ uri: agent.uri, name: agent.name, ...(agent.description ? { description: agent.description } : {}) });
+					this.delegate.setAgent(agent);
 					if (this.element) {
 						this.renderLabel(this.element);
 					}

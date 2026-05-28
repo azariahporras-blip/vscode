@@ -8,7 +8,7 @@ import { IObservable } from '../../base/common/observable.js';
 import { equals } from '../../base/common/objects.js';
 import { RemoteAgentHostConnectionStatus } from '../../platform/agentHost/common/remoteAgentHostService.js';
 import { ResolveSessionConfigResult, SessionConfigValueItem } from '../../platform/agentHost/common/state/protocol/commands.js';
-import { CustomizationAgentRef, RootConfigState } from '../../platform/agentHost/common/state/protocol/state.js';
+import { CustomizationAgentRef, RootConfigState } from '../../platform/agentHost/common/state/sessionState.js';
 import { ISessionsProvider } from '../services/sessions/common/sessionsProvider.js';
 import { ISessionAgentRef } from '../services/sessions/common/session.js';
 

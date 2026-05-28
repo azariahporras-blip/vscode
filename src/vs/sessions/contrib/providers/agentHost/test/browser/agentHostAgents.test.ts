@@ -5,16 +5,23 @@
 
 import assert from 'assert';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../../base/test/common/utils.js';
-import { CustomizationStatus, type CustomizationAgentRef, type SessionCustomization } from '../../../../../../platform/agentHost/common/state/protocol/state.js';
+import { CustomizationStatus, CustomizationType, type CustomizationAgentRef, type SessionCustomization } from '../../../../../../platform/agentHost/common/state/sessionState.js';
 import { getEffectiveAgents } from '../../../../../../platform/agentHost/common/customAgents.js';
 
 function sc(uri: string, agents?: CustomizationAgentRef[], enabled = true): SessionCustomization {
 	return {
-		customization: { uri, displayName: uri },
+		type: CustomizationType.Plugin,
+		id: uri,
+		uri,
+		name: uri,
 		enabled,
-		status: CustomizationStatus.Loaded,
-		...(agents ? { agents } : {}),
+		load: { kind: CustomizationStatus.Loaded },
+		...(agents ? { children: agents } : {}),
 	};
+}
+
+function agent(uri: string, name: string, description?: string): CustomizationAgentRef {
+	return { type: CustomizationType.Agent, id: uri, uri, name, ...(description ? { description } : {}) };
 }
 
 suite('getEffectiveAgents', () => {
@@ -27,44 +34,44 @@ suite('getEffectiveAgents', () => {
 
 	test('treats undefined `agents` as unknown and empty array as no agents', () => {
 		const result = getEffectiveAgents([
-			sc('plugin://a', [{ uri: 'agent://review', name: 'review' }]),
+			sc('plugin://a', [agent('agent://review', 'review')]),
 			sc('plugin://b', []),
 		]);
-		assert.deepStrictEqual(result, [{ uri: 'agent://review', name: 'review' }]);
+		assert.deepStrictEqual(result, [agent('agent://review', 'review')]);
 	});
 
 	test('skips disabled session customizations', () => {
 		const result = getEffectiveAgents([
-			sc('plugin://a', [{ uri: 'agent://a', name: 'a' }], false),
-			sc('plugin://b', [{ uri: 'agent://b', name: 'b' }]),
+			sc('plugin://a', [agent('agent://disabled', 'disabled')], false),
+			sc('plugin://b', [agent('agent://enabled', 'enabled')]),
 		]);
-		assert.deepStrictEqual(result, [{ uri: 'agent://b', name: 'b' }]);
+		assert.deepStrictEqual(result, [agent('agent://enabled', 'enabled')]);
 	});
 
 	test('de-dupes by uri (first-seen wins)', () => {
 		const result = getEffectiveAgents([
 			sc('plugin://a', [
-				{ uri: 'agent://shared', name: 'shared', description: 'from a' },
-				{ uri: 'agent://only-a', name: 'only-a' },
+				agent('agent://one', 'one', 'first'),
+				agent('agent://two', 'two'),
 			]),
 			sc('plugin://b', [
-				{ uri: 'agent://shared', name: 'shared', description: 'from b' },
-				{ uri: 'agent://only-b', name: 'only-b' },
+				agent('agent://one', 'one', 'duplicate'),
+				agent('agent://three', 'three'),
 			]),
 		]);
 		assert.deepStrictEqual(result, [
-			{ uri: 'agent://only-a', name: 'only-a' },
-			{ uri: 'agent://only-b', name: 'only-b' },
-			{ uri: 'agent://shared', name: 'shared', description: 'from a' },
+			agent('agent://one', 'one', 'first'),
+			agent('agent://three', 'three'),
+			agent('agent://two', 'two'),
 		]);
 	});
 
 	test('sorts by name, breaking ties by uri', () => {
 		const result = getEffectiveAgents([
 			sc('plugin://a', [
-				{ uri: 'agent://z', name: 'beta' },
-				{ uri: 'agent://x', name: 'beta' },
-				{ uri: 'agent://y', name: 'alpha' },
+				agent('agent://z', 'same'),
+				agent('agent://x', 'same'),
+				agent('agent://y', 'aaa'),
 			]),
 		]);
 		assert.deepStrictEqual(result.map(a => a.uri), ['agent://y', 'agent://x', 'agent://z']);

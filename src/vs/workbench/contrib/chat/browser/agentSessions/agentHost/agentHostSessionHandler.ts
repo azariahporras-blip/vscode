@@ -23,10 +23,10 @@ import { AgentProvider, AgentSession, type IAgentConnection } from '../../../../
 import { IAgentSubscription, observableFromSubscription } from '../../../../../../platform/agentHost/common/state/agentSubscription.js';
 import { SessionTruncatedAction } from '../../../../../../platform/agentHost/common/state/protocol/actions.js';
 import { CompletionItemKind as AhpCompletionItemKind, type CompletionItem as AhpCompletionItem } from '../../../../../../platform/agentHost/common/state/protocol/commands.js';
-import { ConfirmationOptionKind, CustomizationRef, TerminalClaimKind, ToolResultContentType, type ConfirmationOption, type ProtectedResourceMetadata, type SessionActiveClient } from '../../../../../../platform/agentHost/common/state/protocol/state.js';
+import { ConfirmationOptionKind, TerminalClaimKind, ToolResultContentType, type ConfirmationOption, type ProtectedResourceMetadata, type SessionActiveClient } from '../../../../../../platform/agentHost/common/state/protocol/state.js';
 import { ActionType, SessionTurnStartedAction, type ClientSessionAction, type SessionAction, type SessionInputCompletedAction } from '../../../../../../platform/agentHost/common/state/sessionActions.js';
 import { AHP_AUTH_REQUIRED, ProtocolError } from '../../../../../../platform/agentHost/common/state/sessionProtocol.js';
-import { buildSubagentSessionUri, getToolFileEdits, getToolSubagentContent, MessageAttachmentKind, PendingMessageKind, ResponsePartKind, SessionInputAnswerState, SessionInputAnswerValueKind, SessionInputQuestionKind, SessionInputResponseKind, StateComponents, ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallStatus, TurnState, type ICompletedToolCall, type MarkdownResponsePart, type MessageAttachment, type ModelSelection, type ReasoningResponsePart, type RootState, type SessionInputAnswer, type SessionInputRequest, type SessionState, type ToolCallResponsePart, type ToolCallState, type Turn, type UsageInfo } from '../../../../../../platform/agentHost/common/state/sessionState.js';
+import { buildSubagentSessionUri, getToolFileEdits, getToolSubagentContent, MessageAttachmentKind, MessageKind, PendingMessageKind, ResponsePartKind, SessionInputAnswerState, SessionInputAnswerValueKind, SessionInputQuestionKind, SessionInputResponseKind, StateComponents, ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallStatus, TurnState, type CustomizationRef, type ICompletedToolCall, type MarkdownResponsePart, type Message, type MessageAttachment, type ModelSelection, type ReasoningResponsePart, type RootState, type SessionInputAnswer, type SessionInputRequest, type SessionState, type ToolCallResponsePart, type ToolCallState, type Turn, type UsageInfo } from '../../../../../../platform/agentHost/common/state/sessionState.js';
 import { ExtensionIdentifier } from '../../../../../../platform/extensions/common/extensions.js';
 import { IInstantiationService } from '../../../../../../platform/instantiation/common/instantiation.js';
 import { ILogService } from '../../../../../../platform/log/common/log.js';
@@ -56,7 +56,7 @@ import { IAgentHostSessionWorkingDirectoryResolver } from './agentHostSessionWor
 import { AgentHostSnapshotController } from './agentHostSnapshotController.js';
 import { toolDataToDefinition } from './agentHostToolUtils.js';
 import { IAgentHostUntitledProvisionalSessionService } from './agentHostUntitledProvisionalSessionService.js';
-import { activeTurnToProgress, completedToolCallToEditParts, completedToolCallToSerialized, finalizeToolInvocation, getTerminalContentUri, isSubagentTool, makeAhpTerminalToolSessionId, parseAhpTerminalToolSessionId, rawMarkdownToString, stringOrMarkdownToString, toolCallStateToInvocation, turnsToHistory, updateRunningToolSpecificData, usageInfoToChatUsage, userMessageToVariableData, type IToolCallFileEdit, type TurnModelLookup } from './stateToProgressAdapter.js';
+import { activeTurnToProgress, completedToolCallToEditParts, completedToolCallToSerialized, finalizeToolInvocation, getTerminalContentUri, isSubagentTool, makeAhpTerminalToolSessionId, messageToVariableData, parseAhpTerminalToolSessionId, rawMarkdownToString, stringOrMarkdownToString, toolCallStateToInvocation, turnsToHistory, updateRunningToolSpecificData, usageInfoToChatUsage, type IToolCallFileEdit, type TurnModelLookup } from './stateToProgressAdapter.js';
 export { toolDataToDefinition };
 
 // =============================================================================
@@ -106,7 +106,12 @@ interface IObserveTurnOptions {
 
 interface IStartServerRequestOptions {
 	readonly isSystemInitiated?: boolean;
-	readonly systemInitiatedLabel?: string;
+}
+
+function userOriginMessage(text: string, attachments: readonly MessageAttachment[] | undefined): Message {
+	return attachments?.length
+		? { text, origin: { kind: MessageKind.User }, attachments: [...attachments] }
+		: { text, origin: { kind: MessageKind.User } };
 }
 
 function getCopilotCredits(usage: UsageInfo | undefined): number | undefined {
@@ -319,7 +324,6 @@ class AgentHostChatSession extends Disposable implements IChatSession {
 			prompt,
 			variableData,
 			isSystemInitiated: options?.isSystemInitiated,
-			systemInitiatedLabel: options?.systemInitiatedLabel,
 		});
 	}
 }
@@ -618,12 +622,11 @@ export class AgentHostSessionHandler extends Disposable implements IChatSessionC
 						const activeRawModelId = sessionState.activeTurn.usage?.model ?? fallbackRawModelId;
 						history.push({
 							type: 'request',
-							prompt: sessionState.activeTurn.userMessage.text,
+							prompt: sessionState.activeTurn.message.text,
 							participant: this._config.agentId,
 							modelId: lookup.toLanguageModelId(activeRawModelId),
-							variableData: userMessageToVariableData(sessionState.activeTurn.userMessage, this._config.connectionAuthority),
-							isSystemInitiated: !!sessionState.activeTurn.systemInitiatedLabel,
-							systemInitiatedLabel: sessionState.activeTurn.systemInitiatedLabel,
+							variableData: messageToVariableData(sessionState.activeTurn.message, this._config.connectionAuthority),
+							isSystemInitiated: sessionState.activeTurn.message.origin.kind === MessageKind.SystemNotification,
 						});
 						history.push({
 							type: 'response',
@@ -860,12 +863,12 @@ export class AgentHostSessionHandler extends Disposable implements IChatSessionC
 
 		// --- Steering ---
 		if (currentSteering) {
-			if (currentSteering.id !== prevSteering?.id || currentSteering.text !== prevSteering.userMessage.text) {
+			if (currentSteering.id !== prevSteering?.id || currentSteering.text !== prevSteering.message.text) {
 				this._dispatchAction(backendSession, {
 					type: ActionType.SessionPendingMessageSet,
 					kind: PendingMessageKind.Steering,
 					id: currentSteering.id,
-					userMessage: { text: currentSteering.text, attachments: currentSteering.attachments },
+					message: userOriginMessage(currentSteering.text, currentSteering.attachments),
 				});
 			}
 		} else if (prevSteering) {
@@ -892,12 +895,12 @@ export class AgentHostSessionHandler extends Disposable implements IChatSessionC
 		const prevQueuedById = new Map(prevQueued.map(q => [q.id, q]));
 		for (const q of currentQueued) {
 			const prev = prevQueuedById.get(q.id);
-			if (!prev || q.text !== prev.userMessage.text) {
+			if (!prev || q.text !== prev.message.text) {
 				this._dispatchAction(backendSession, {
 					type: ActionType.SessionPendingMessageSet,
 					kind: PendingMessageKind.Queued,
 					id: q.id,
-					userMessage: { text: q.text, attachments: q.attachments },
+					message: userOriginMessage(q.text, q.attachments),
 				});
 			}
 		}
@@ -1024,11 +1027,10 @@ export class AgentHostSessionHandler extends Disposable implements IChatSessionC
 
 			// Signal the session to create a new request+response pair
 			chatSession.startServerRequest(
-				activeTurn.userMessage.text,
-				userMessageToVariableData(activeTurn.userMessage, this._config.connectionAuthority),
+				activeTurn.message.text,
+				messageToVariableData(activeTurn.message, this._config.connectionAuthority),
 				{
-					isSystemInitiated: !!activeTurn.systemInitiatedLabel,
-					systemInitiatedLabel: activeTurn.systemInitiatedLabel,
+					isSystemInitiated: activeTurn.message.origin.kind === MessageKind.SystemNotification,
 				},
 			);
 
@@ -1142,10 +1144,7 @@ export class AgentHostSessionHandler extends Disposable implements IChatSessionC
 		const turnAction: SessionTurnStartedAction = {
 			type: ActionType.SessionTurnStarted,
 			turnId,
-			userMessage: {
-				text: request.message,
-				attachments: messageAttachments.length > 0 ? messageAttachments : undefined,
-			},
+			message: userOriginMessage(request.message, messageAttachments),
 		};
 		this._config.connection.dispatch(session.toString(), turnAction);
 

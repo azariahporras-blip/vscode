@@ -14,7 +14,7 @@ import { toAgentClientUri } from '../common/agentClientUri.js';
 import type { IAgent } from '../common/agentService.js';
 import { CompletionItem, CompletionItemKind, CompletionsParams } from '../common/state/protocol/commands.js';
 import { MessageAttachmentKind } from '../common/state/protocol/state.js';
-import { CustomizationStatus, type CustomizationRef, type SessionCustomization } from '../common/state/sessionState.js';
+import { CustomizationStatus, CustomizationType, type CustomizationRef, type SessionCustomization } from '../common/state/sessionState.js';
 import { parsePlugin, type INamedPluginResource } from '../../agentPlugins/common/pluginParsers.js';
 import { CompletionTriggerCharacter, IAgentHostCompletionItemProvider } from './agentHostCompletions.js';
 import { extractLeadingSlashToken } from './agentHostSlashCompletion.js';
@@ -23,7 +23,7 @@ interface ISkillCustomizationCandidate {
 	readonly customization: CustomizationRef;
 	readonly enabled: boolean;
 	readonly clientId?: string;
-	readonly status?: CustomizationStatus;
+	readonly load?: CustomizationStatus;
 }
 
 interface ISkillCompletionMetadata {
@@ -128,12 +128,15 @@ export class AgentHostSkillCompletionProvider extends Disposable implements IAge
 		const seen = new Set<string>();
 		const candidates: ISkillCustomizationCandidate[] = [];
 		for (const item of sessionCustomizations) {
-			seen.add(item.customization.uri);
+			if (item.type !== CustomizationType.Plugin) {
+				continue;
+			}
+			seen.add(item.uri);
 			candidates.push({
-				customization: item.customization,
+				customization: item,
 				enabled: item.enabled,
 				...(item.clientId !== undefined ? { clientId: item.clientId } : {}),
-				...(item.status !== undefined ? { status: item.status } : {}),
+				...(item.load !== undefined ? { load: item.load.kind } : {}),
 			});
 		}
 
@@ -145,7 +148,7 @@ export class AgentHostSkillCompletionProvider extends Disposable implements IAge
 			candidates.push({ customization, enabled: true });
 		}
 
-		return candidates.filter(candidate => candidate.enabled && candidate.status !== CustomizationStatus.Loading && candidate.status !== CustomizationStatus.Error);
+		return candidates.filter(candidate => candidate.enabled && candidate.load !== CustomizationStatus.Loading && candidate.load !== CustomizationStatus.Error);
 	}
 
 	private _watchAgent(agent: IAgent): void {

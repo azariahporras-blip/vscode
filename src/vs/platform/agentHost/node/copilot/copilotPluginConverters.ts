@@ -10,7 +10,7 @@ import { parseFrontMatter } from '../../../../base/common/yaml.js';
 import { IFileService } from '../../../files/common/files.js';
 import { McpServerType } from '../../../mcp/common/mcpPlatformTypes.js';
 import type { IMcpServerDefinition, INamedPluginResource, IParsedHookCommand, IParsedHookGroup, IParsedPlugin } from '../../../agentPlugins/common/pluginParsers.js';
-import type { CustomizationAgentRef } from '../../common/state/protocol/state.js';
+import { CustomizationType, type CustomizationAgentRef } from '../../common/state/sessionState.js';
 import { dirname } from '../../../../base/common/path.js';
 
 type SessionHooks = NonNullable<SessionConfig['hooks']>;
@@ -111,6 +111,8 @@ export async function toSdkCustomAgents(agents: readonly INamedPluginResource[],
  */
 export function toCustomizationAgentRefs(agents: readonly INamedPluginResource[]): CustomizationAgentRef[] {
 	return agents.map(a => ({
+		type: CustomizationType.Agent,
+		id: a.uri.toString(),
 		uri: a.uri.toString(),
 		name: a.name,
 		...(a.description ? { description: a.description } : {}),

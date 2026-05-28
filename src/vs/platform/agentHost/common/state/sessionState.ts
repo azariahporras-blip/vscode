@@ -17,7 +17,10 @@ import {
 	ToolResultContentType,
 	ToolResultFileEditContent,
 	type ActiveTurn,
+	type AgentCustomization,
 	type ChangesetState,
+	type ClientPluginCustomization,
+	type Customization,
 	type RootState,
 	type SessionState,
 	type SessionSummary,
@@ -29,7 +32,7 @@ import {
 	type ToolResultSubagentContent,
 	type ToolResultTextContent,
 	type URI as ProtocolURI,
-	type UserMessage,
+	type Message,
 	TerminalState,
 } from './protocol/state.js';
 
@@ -37,23 +40,25 @@ import {
 export {
 	type ActiveTurn,
 	type AgentInfo,
+	type AgentCustomization,
 	type ConfigPropertySchema,
 	type ConfigSchema,
 	type ContentRef,
 	type ErrorInfo,
 	type ProjectInfo,
 	type MarkdownResponsePart,
+	type Message,
 	type MessageAttachment,
 	type MessageResourceAttachment,
 	type ReasoningResponsePart,
 	type ResponsePart,
 	type RootState,
+	type RootConfigState,
 	type SessionActiveClient,
 	type SessionConfigState,
 	type FileEdit as ISessionFileDiff,
 	type ModelSelection,
 	type AgentSelection,
-	type CustomizationAgentRef,
 	type SessionModelInfo,
 	type SessionState,
 	type SessionSummary,
@@ -70,8 +75,8 @@ export {
 	type ToolCallState,
 	type ToolCallStreamingState,
 	type ToolDefinition,
-	type CustomizationRef,
-	type SessionCustomization,
+	type ClientPluginCustomization,
+	type Customization,
 	type ToolResultEmbeddedResourceContent as IToolResultBinaryContent,
 	type ToolResultContent,
 	type ToolResultFileEditContent,
@@ -79,7 +84,6 @@ export {
 	type ToolResultTextContent,
 	type Turn,
 	type UsageInfo,
-	type UserMessage,
 	type PendingMessage,
 	type StringOrMarkdown,
 	type URI,
@@ -91,8 +95,10 @@ export {
 	type ChangesetState,
 	type ChangesetFile,
 	type ChangesetOperation,
-	CustomizationStatus,
+	CustomizationLoadStatus,
+	CustomizationType,
 	MessageAttachmentKind,
+	MessageKind,
 	PendingMessageKind,
 	PolicyState,
 	ResponsePartKind,
@@ -110,6 +116,11 @@ export {
 	ChangesetStatus,
 	ChangesetOperationScope,
 } from './protocol/state.js';
+
+export type CustomizationRef = ClientPluginCustomization;
+export type CustomizationAgentRef = AgentCustomization;
+export type SessionCustomization = Customization;
+export { CustomizationLoadStatus as CustomizationStatus } from './protocol/state.js';
 
 export {
 	type ChangesetOperationTarget,
@@ -305,10 +316,10 @@ export function createSessionState(summary: SessionSummary): SessionState {
 	};
 }
 
-export function createActiveTurn(id: string, userMessage: UserMessage): ActiveTurn {
+export function createActiveTurn(id: string, message: Message): ActiveTurn {
 	return {
 		id,
-		userMessage,
+		message,
 		responseParts: [],
 		usage: undefined,
 	};

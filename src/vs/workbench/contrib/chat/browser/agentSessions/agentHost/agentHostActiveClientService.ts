@@ -13,7 +13,7 @@ import { InstantiationType, registerSingleton } from '../../../../../../platform
 import { createDecorator, IInstantiationService } from '../../../../../../platform/instantiation/common/instantiation.js';
 import { observableConfigValue } from '../../../../../../platform/observable/common/platformObservableUtils.js';
 import { IStorageService } from '../../../../../../platform/storage/common/storage.js';
-import type { CustomizationRef, SessionActiveClient, ToolDefinition } from '../../../../../../platform/agentHost/common/state/protocol/state.js';
+import type { CustomizationRef, SessionActiveClient, ToolDefinition } from '../../../../../../platform/agentHost/common/state/sessionState.js';
 import { ChatConfiguration } from '../../../common/constants.js';
 import { ICustomizationSyncProvider } from '../../../common/customizationHarnessService.js';
 import { IAgentPluginService } from '../../../common/plugins/agentPluginService.js';

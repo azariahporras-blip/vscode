@@ -7,15 +7,17 @@ import type { SessionEventPayload } from '@github/copilot-sdk';
 import { localize } from '../../../../nls.js';
 
 export interface ICopilotSystemNotification {
-	readonly message: string;
-	readonly label: string;
+	/** Body shown inside an active turn; cleaned from SDK `system.notification.data.content`. */
+	readonly content: string;
+	/** Text for a new system-origin AHP turn; derived from SDK `data.kind` metadata, e.g. shell completion `description`. */
+	readonly messageText: string;
 }
 
 export function buildCopilotSystemNotification(event: SessionEventPayload<'system.notification'>): ICopilotSystemNotification | undefined {
 	const data = event.data;
 	const kind = data.kind;
-	const message = cleanSystemNotificationContent(data.content);
-	if (!message) {
+	const content = cleanSystemNotificationContent(data.content);
+	if (!content) {
 		return undefined;
 	}
 
@@ -25,8 +27,8 @@ export function buildCopilotSystemNotification(event: SessionEventPayload<'syste
 			const description = kind.description;
 			const shellId = kind.shellId;
 			return {
-				message,
-				label: description
+				content,
+				messageText: description
 					? localize('agentHost.copilot.systemNotification.shellDescriptionCompleted', "`{0}` completed", description)
 					: shellId
 						? localize('agentHost.copilot.systemNotification.shellIdCompleted', "Shell `{0}` completed", shellId)
@@ -35,8 +37,8 @@ export function buildCopilotSystemNotification(event: SessionEventPayload<'syste
 		}
 		case 'agent_completed':
 			return {
-				message,
-				label: localize('agentHost.copilot.systemNotification.agentCompleted', "Background agent completed"),
+				content,
+				messageText: localize('agentHost.copilot.systemNotification.agentCompleted', "Background agent completed"),
 			};
 		default:
 			return undefined;

@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import type { URI } from '../../../base/common/uri.js';
-import type { CustomizationAgentRef, SessionCustomization } from './state/protocol/state.js';
+import { CustomizationType, type CustomizationAgentRef, type SessionCustomization } from './state/sessionState.js';
 
 /**
  * Computes the effective set of selectable custom agents for a session.
@@ -25,10 +25,13 @@ export function getEffectiveAgents(
 	const seen = new Map<string, CustomizationAgentRef>();
 	if (sessionCustomizations) {
 		for (const customization of sessionCustomizations) {
-			if (customization.enabled === false || !customization.agents) {
+			if ((customization.type !== CustomizationType.Plugin && customization.type !== CustomizationType.Directory) || customization.enabled === false || !customization.children) {
 				continue;
 			}
-			for (const agent of customization.agents) {
+			for (const agent of customization.children) {
+				if (agent.type !== CustomizationType.Agent) {
+					continue;
+				}
 				const key = agent.uri.toString();
 				if (!seen.has(key)) {
 					seen.set(key, agent);

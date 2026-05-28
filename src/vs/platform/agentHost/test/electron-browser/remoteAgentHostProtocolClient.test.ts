@@ -23,7 +23,7 @@ import { ActionType, type SessionActiveClientChangedAction, type SessionTitleCha
 import { ProtocolError, type AhpServerNotification, type JsonRpcNotification, type JsonRpcRequest, type JsonRpcResponse, type ProtocolMessage } from '../../common/state/sessionProtocol.js';
 import { hasKey } from '../../../../base/common/types.js';
 import { mainWindow } from '../../../../base/browser/window.js';
-import { ROOT_STATE_URI, StateComponents } from '../../common/state/sessionState.js';
+import { CustomizationType, ROOT_STATE_URI, StateComponents } from '../../common/state/sessionState.js';
 import type { IClientTransport, IProtocolTransport } from '../../common/state/sessionTransport.js';
 import { TestConfigurationService } from '../../../configuration/test/common/testConfigurationService.js';
 import { TelemetryLevel } from '../../../telemetry/common/telemetry.js';
@@ -73,6 +73,10 @@ class CloseOnDisposeProtocolTransport extends TestProtocolTransport {
 }
 
 suite('RemoteAgentHostProtocolClient', () => {
+
+	function pluginCustomization(uri: string, name: string) {
+		return { type: CustomizationType.Plugin, id: uri, uri, name, enabled: true } as const;
+	}
 	const disposables = ensureNoDisposablesAreLeakedInTestSuite();
 
 	function createPermissionService(allow = true): IAgentHostPermissionService {
@@ -642,8 +646,8 @@ suite('RemoteAgentHostProtocolClient', () => {
 					clientId: 'c1',
 					tools: [],
 					customizations: [
-						{ uri: 'file:///plugins/foo', displayName: 'Foo' },
-						{ uri: 'file:///other/bar', displayName: 'Bar' },
+						pluginCustomization('file:///plugins/foo', 'Foo'),
+						pluginCustomization('file:///other/bar', 'Bar'),
 					]
 				},
 			});
@@ -668,8 +672,8 @@ suite('RemoteAgentHostProtocolClient', () => {
 					clientId: 'c1',
 					tools: [],
 					customizations: [
-						{ uri: 'file:///plugins/foo', displayName: 'Foo' },
-						{ uri: 'file:///plugins/bar', displayName: 'Bar' },
+						pluginCustomization('file:///plugins/foo', 'Foo'),
+						pluginCustomization('file:///plugins/bar', 'Bar'),
 					]
 				},
 			});
@@ -691,7 +695,7 @@ suite('RemoteAgentHostProtocolClient', () => {
 					clientId: 'c1',
 					tools: [],
 					customizations: [
-						{ uri: 'file:///plugins/foo', displayName: 'Foo' },
+						pluginCustomization('file:///plugins/foo', 'Foo'),
 					]
 				},
 			};
@@ -725,7 +729,7 @@ suite('RemoteAgentHostProtocolClient', () => {
 					clientId: 'c1',
 					tools: [],
 					customizations: [
-						{ uri: 'file:///plugins/foo', displayName: 'Foo' },
+						pluginCustomization('file:///plugins/foo', 'Foo'),
 					],
 				},
 			});

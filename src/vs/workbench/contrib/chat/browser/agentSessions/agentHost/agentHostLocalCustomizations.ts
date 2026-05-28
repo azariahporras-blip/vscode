@@ -7,7 +7,7 @@ import { CancellationToken } from '../../../../../../base/common/cancellation.js
 import { isEqualOrParent } from '../../../../../../base/common/resources.js';
 import { URI } from '../../../../../../base/common/uri.js';
 import { type URI as ProtocolURI } from '../../../../../../platform/agentHost/common/state/protocol/state.js';
-import { type CustomizationRef } from '../../../../../../platform/agentHost/common/state/sessionState.js';
+import { CustomizationType, type CustomizationRef } from '../../../../../../platform/agentHost/common/state/sessionState.js';
 import { AICustomizationSource, AICustomizationSources, BUILTIN_STORAGE } from '../../../common/aiCustomizationWorkspaceService.js';
 import { PromptsType } from '../../../common/promptSyntax/promptTypes.js';
 import { IPromptPath, IPromptsService, matchesSessionType, PromptsStorage } from '../../../common/promptSyntax/service/promptsService.js';
@@ -156,7 +156,7 @@ export async function resolveCustomizationRefs(
 			}
 			const key = plugin.uri.toString();
 			if (!pluginRefs.has(key)) {
-				pluginRefs.set(key, { uri: key as ProtocolURI, displayName: plugin.label });
+				pluginRefs.set(key, { type: CustomizationType.Plugin, id: key, uri: key as ProtocolURI, name: plugin.label, enabled: true });
 			}
 		} else {
 			looseFiles.push({ uri: entry.uri, type: entry.type });

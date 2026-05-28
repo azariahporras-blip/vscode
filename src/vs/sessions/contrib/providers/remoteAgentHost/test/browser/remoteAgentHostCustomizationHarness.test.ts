@@ -10,8 +10,8 @@ import { mock } from '../../../../../../base/test/common/mock.js';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../../base/test/common/utils.js';
 import { type IAgentConnection } from '../../../../../../platform/agentHost/common/agentService.js';
 import { ActionType, isSessionAction, type ActionEnvelope, type INotification, type StateAction } from '../../../../../../platform/agentHost/common/state/sessionActions.js';
-import { CustomizationStatus, type AgentInfo, type CustomizationRef, type RootState, type SessionCustomization, type SessionState } from '../../../../../../platform/agentHost/common/state/protocol/state.js';
-import { StateComponents, type ComponentToState } from '../../../../../../platform/agentHost/common/state/sessionState.js';
+import { type AgentInfo, type RootState, type SessionState } from '../../../../../../platform/agentHost/common/state/protocol/state.js';
+import { CustomizationStatus, CustomizationType, StateComponents, type ComponentToState, type CustomizationRef, type SessionCustomization } from '../../../../../../platform/agentHost/common/state/sessionState.js';
 import { sessionReducer } from '../../../../../../platform/agentHost/common/state/sessionReducers.js';
 import { type IAgentSubscription } from '../../../../../../platform/agentHost/common/state/agentSubscription.js';
 import { IFileDialogService } from '../../../../../../platform/dialogs/common/dialogs.js';
@@ -117,6 +117,10 @@ function createAgentInfo(customizations: readonly CustomizationRef[]): AgentInfo
 	};
 }
 
+function pluginCustomization(uri: string, name: string, nonce?: string): CustomizationRef {
+	return { type: CustomizationType.Plugin, id: uri, uri, name, enabled: true, ...(nonce ? { nonce } : {}) };
+}
+
 
 
 suite('RemoteAgentHostCustomizationHarness', () => {
@@ -134,11 +138,8 @@ suite('RemoteAgentHostCustomizationHarness', () => {
 			createNotificationService(),
 			{} as IAICustomizationWorkspaceService,
 		));
-		const pluginA: CustomizationRef = { uri: 'file:///plugins/shared', displayName: 'Shared Plugin' };
-		const pluginB: CustomizationRef = {
-			uri: 'file:///plugins/other',
-			displayName: 'Other Plugin',
-		};
+		const pluginA: CustomizationRef = pluginCustomization('file:///plugins/shared', 'Shared Plugin');
+		const pluginB: CustomizationRef = pluginCustomization('file:///plugins/other', 'Other Plugin');
 		connection.setRootState({
 			agents: [],
 			config: {
@@ -170,8 +171,8 @@ suite('RemoteAgentHostCustomizationHarness', () => {
 			createNotificationService(),
 			{} as IAICustomizationWorkspaceService,
 		));
-		const pluginA: CustomizationRef = { uri: 'file:///plugins/a', displayName: 'Plugin A' };
-		const pluginB: CustomizationRef = { uri: 'file:///plugins/b', displayName: 'Plugin B' };
+		const pluginA: CustomizationRef = pluginCustomization('file:///plugins/a', 'Plugin A');
+		const pluginB: CustomizationRef = pluginCustomization('file:///plugins/b', 'Plugin B');
 
 		connection.setRootState({
 			agents: [createAgentInfo([pluginA, pluginB])],
@@ -206,12 +207,8 @@ suite('RemoteAgentHostCustomizationHarness', () => {
 			createNotificationService(),
 			{} as IAICustomizationWorkspaceService,
 		));
-		const hostScoped: CustomizationRef = { uri: 'file:///plugins/shared', displayName: 'Shared Plugin' };
-		const synced: SessionCustomization = {
-			customization: hostScoped,
-			clientId: 'test-client',
-			enabled: true,
-		};
+		const hostScoped: CustomizationRef = pluginCustomization('file:///plugins/shared', 'Shared Plugin');
+		const synced: SessionCustomization = { ...hostScoped, clientId: 'test-client' };
 
 		connection.setRootState({
 			agents: [createAgentInfo([hostScoped])],
@@ -256,13 +253,9 @@ suite('RemoteAgentHostCustomizationHarness', () => {
 			createNotificationService(),
 			{} as IAICustomizationWorkspaceService,
 		));
-		const hostPlugin: CustomizationRef = { uri: 'file:///plugins/host-plugin', displayName: 'Host Plugin' };
-		const clientPlugin: CustomizationRef = { uri: 'file:///plugins/client-plugin', displayName: 'Client Plugin' };
-		const synced: SessionCustomization = {
-			customization: clientPlugin,
-			clientId: 'test-client',
-			enabled: true,
-		};
+		const hostPlugin: CustomizationRef = pluginCustomization('file:///plugins/host-plugin', 'Host Plugin');
+		const clientPlugin: CustomizationRef = pluginCustomization('file:///plugins/client-plugin', 'Client Plugin');
+		const synced: SessionCustomization = { ...clientPlugin, clientId: 'test-client' };
 
 		connection.setRootState({
 			agents: [createAgentInfo([hostPlugin])],
@@ -315,13 +308,8 @@ suite('RemoteAgentHostCustomizationHarness', () => {
 		));
 
 		const bundleUri = `${SYNCED_CUSTOMIZATION_SCHEME}:///test-authority`;
-		const bundleRef: CustomizationRef = { uri: bundleUri, displayName: 'VS Code Synced Data', nonce: 'abc' };
-		const synced: SessionCustomization = {
-			customization: bundleRef,
-			clientId: 'test-client',
-			enabled: true,
-			status: CustomizationStatus.Loaded,
-		};
+		const bundleRef: CustomizationRef = pluginCustomization(bundleUri, 'VS Code Synced Data', 'abc');
+		const synced: SessionCustomization = { ...bundleRef, clientId: 'test-client', load: { kind: CustomizationStatus.Loaded } };
 
 		connection.setRootState({ agents: [createAgentInfo([])] });
 
@@ -411,12 +399,8 @@ suite('RemoteAgentHostCustomizationHarness', () => {
 		));
 
 		const bundleUri = `${SYNCED_CUSTOMIZATION_SCHEME}:///test-authority`;
-		const bundleRef: CustomizationRef = { uri: bundleUri, displayName: 'VS Code Synced Data', nonce: 'abc' };
-		const synced: SessionCustomization = {
-			customization: bundleRef,
-			clientId: 'test-client',
-			enabled: true,
-		};
+		const bundleRef: CustomizationRef = pluginCustomization(bundleUri, 'VS Code Synced Data', 'abc');
+		const synced: SessionCustomization = { ...bundleRef, clientId: 'test-client' };
 
 		connection.setRootState({ agents: [createAgentInfo([])] });
 
@@ -464,13 +448,8 @@ suite('RemoteAgentHostCustomizationHarness', () => {
 			{} as IAICustomizationWorkspaceService,
 		));
 
-		const pluginRef: CustomizationRef = { uri: 'file:///plugins/my-plugin', displayName: 'My Plugin' };
-		const sessionCustomization: SessionCustomization = {
-			customization: pluginRef,
-			enabled: false,
-			status: CustomizationStatus.Error,
-			statusMessage: 'something went wrong',
-		};
+		const pluginRef: CustomizationRef = pluginCustomization('file:///plugins/my-plugin', 'My Plugin');
+		const sessionCustomization: SessionCustomization = { ...pluginRef, enabled: false, load: { kind: CustomizationStatus.Error, message: 'something went wrong' } };
 
 		connection.setRootState({ agents: [createAgentInfo([pluginRef])] });
 
@@ -517,7 +496,7 @@ suite('RemoteAgentHostCustomizationHarness', () => {
 			{} as IAICustomizationWorkspaceService,
 		));
 
-		const pluginRef: CustomizationRef = { uri: 'file:///plugins/host', displayName: 'Host Plugin' };
+		const pluginRef: CustomizationRef = pluginCustomization('file:///plugins/host', 'Host Plugin');
 		connection.setRootState({ agents: [createAgentInfo([pluginRef])] });
 
 		const fileService = new class extends mock<IFileService>() {
@@ -543,10 +522,7 @@ suite('RemoteAgentHostCustomizationHarness', () => {
 			origin: undefined,
 			action: {
 				type: ActionType.SessionCustomizationsChanged,
-				customizations: [{
-					customization: pluginRef,
-					enabled: true
-				}],
+				customizations: [pluginRef],
 			},
 		});
 
@@ -564,8 +540,8 @@ suite('RemoteAgentHostCustomizationHarness', () => {
 			{} as IAICustomizationWorkspaceService,
 		));
 
-		const hostPlugin: CustomizationRef = { uri: 'file:///plugins/host', displayName: 'Host Plugin' };
-		const clientPlugin: CustomizationRef = { uri: 'file:///plugins/client', displayName: 'Client Plugin' };
+		const hostPlugin: CustomizationRef = pluginCustomization('file:///plugins/host', 'Host Plugin');
+		const clientPlugin: CustomizationRef = pluginCustomization('file:///plugins/client', 'Client Plugin');
 
 		connection.setRootState({ agents: [createAgentInfo([hostPlugin])] });
 
@@ -589,11 +565,7 @@ suite('RemoteAgentHostCustomizationHarness', () => {
 			origin: undefined,
 			action: {
 				type: ActionType.SessionCustomizationsChanged,
-				customizations: [{
-					customization: clientPlugin,
-					clientId: 'test-client',
-					enabled: true
-				}],
+				customizations: [{ ...clientPlugin, clientId: 'test-client' }],
 			},
 		});
 
@@ -618,9 +590,9 @@ suite('RemoteAgentHostCustomizationHarness', () => {
 			{} as IAICustomizationWorkspaceService,
 		));
 
-		const pluginA: CustomizationRef = { uri: 'file:///plugins/a', displayName: 'Plugin A' };
-		const pluginB: CustomizationRef = { uri: 'file:///plugins/b', displayName: 'Plugin B' };
-		const pluginC: CustomizationRef = { uri: 'file:///plugins/c', displayName: 'Plugin C' };
+		const pluginA: CustomizationRef = pluginCustomization('file:///plugins/a', 'Plugin A');
+		const pluginB: CustomizationRef = pluginCustomization('file:///plugins/b', 'Plugin B');
+		const pluginC: CustomizationRef = pluginCustomization('file:///plugins/c', 'Plugin C');
 
 		connection.setRootState({
 			agents: [],
@@ -655,8 +627,8 @@ suite('RemoteAgentHostCustomizationHarness', () => {
 			{} as IAICustomizationWorkspaceService,
 		));
 
-		const clientA: CustomizationRef = { uri: 'file:///plugins/client-a', displayName: 'Client A' };
-		const clientB: CustomizationRef = { uri: 'file:///plugins/client-b', displayName: 'Client B' };
+		const clientA: CustomizationRef = pluginCustomization('file:///plugins/client-a', 'Client A');
+		const clientB: CustomizationRef = pluginCustomization('file:///plugins/client-b', 'Client B');
 
 		connection.setRootState({ agents: [createAgentInfo([])] });
 
@@ -681,8 +653,8 @@ suite('RemoteAgentHostCustomizationHarness', () => {
 			action: {
 				type: ActionType.SessionCustomizationsChanged,
 				customizations: [
-					{ customization: clientA, clientId: 'test-client', enabled: true },
-					{ customization: clientB, clientId: 'test-client', enabled: true },
+					{ ...clientA, clientId: 'test-client' },
+					{ ...clientB, clientId: 'test-client' },
 				],
 			},
 		});
@@ -705,7 +677,7 @@ suite('RemoteAgentHostCustomizationHarness', () => {
 			createNotificationService(),
 			{} as IAICustomizationWorkspaceService,
 		));
-		const plugin: CustomizationRef = { uri: 'file:///plugins/skills-bundle', displayName: 'Skills Bundle' };
+		const plugin: CustomizationRef = pluginCustomization('file:///plugins/skills-bundle', 'Skills Bundle');
 
 		connection.setRootState({ agents: [createAgentInfo([plugin])] });
 
@@ -779,7 +751,7 @@ suite('RemoteAgentHostCustomizationHarness', () => {
 			createNotificationService(),
 			{} as IAICustomizationWorkspaceService,
 		));
-		const plugin: CustomizationRef = { uri: 'file:///plugins/skills-bundle', displayName: 'Skills Bundle' };
+		const plugin: CustomizationRef = pluginCustomization('file:///plugins/skills-bundle', 'Skills Bundle');
 
 		connection.setRootState({ agents: [createAgentInfo([plugin])] });
 

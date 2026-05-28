@@ -8,7 +8,7 @@ import { Disposable } from '../../../../../../base/common/lifecycle.js';
 import { Emitter, Event } from '../../../../../../base/common/event.js';
 import { ResourceMap } from '../../../../../../base/common/map.js';
 import { URI } from '../../../../../../base/common/uri.js';
-import { CustomizationStatus, StateComponents, type SessionCustomization, type AgentInfo, type CustomizationRef, type RootState } from '../../../../../../platform/agentHost/common/state/sessionState.js';
+import { CustomizationStatus, CustomizationType, StateComponents, type SessionCustomization, type AgentInfo, type CustomizationRef, type RootState } from '../../../../../../platform/agentHost/common/state/sessionState.js';
 import { ILogService } from '../../../../../../platform/log/common/log.js';
 import { ICustomizationAgentRef, ICustomizationItem, ICustomizationItemAction, ICustomizationItemProvider } from '../../../common/customizationHarnessService.js';
 import { SYNCED_CUSTOMIZATION_SCHEME } from '../../../../../services/agentHost/common/agentHostFileSystemService.js';
@@ -26,13 +26,14 @@ const REMOTE_CLIENT_GROUP = 'remote-client';
 
 
 type PluginMeta = { item: ICustomizationItem; nonce: string | undefined; status: ReturnType<typeof toStatusString>; statusMessage: string | undefined; enabled: boolean | undefined; childGroupKey: string; isBundleItem: boolean };
+type CustomizationItemSource = CustomizationRef | SessionCustomization;
 
 
 export class AgentCustomizationItemProvider extends Disposable implements ICustomizationItemProvider {
 	private readonly _onDidChange = this._register(new Emitter<void>());
 	readonly onDidChange: Event<void> = this._onDidChange.event;
 
-	private _agentCustomizations: readonly CustomizationRef[];
+	private _agentCustomizations: readonly CustomizationItemSource[];
 
 	/** Cache: pluginUri → last expansion (keyed by nonce so we re-fetch on content change). */
 	private readonly _expansionCache = new ResourceMap<{ nonce: string | undefined; children: readonly ICustomizationItem[] }>();
@@ -75,7 +76,7 @@ export class AgentCustomizationItemProvider extends Disposable implements ICusto
 		return getAgentHostConfiguredCustomizations(rootState.config?.values);
 	}
 
-	private _readAgentCustomizations(rootState: RootState | Error | undefined): readonly CustomizationRef[] | undefined {
+	private _readAgentCustomizations(rootState: RootState | Error | undefined): readonly SessionCustomization[] | undefined {
 		if (!rootState || rootState instanceof Error) {
 			return undefined;
 		}
@@ -95,7 +96,7 @@ export class AgentCustomizationItemProvider extends Disposable implements ICusto
 		return toAgentHostUri(original, this._connectionAuthority);
 	}
 
-	private toBadge(customization: CustomizationRef, fromClient: boolean): { badge?: string; badgeTooltip?: string; groupKey?: string } {
+	private toBadge(_customization: CustomizationItemSource, fromClient: boolean): { badge?: string; badgeTooltip?: string; groupKey?: string } {
 		if (fromClient) {
 			return {
 				groupKey: REMOTE_CLIENT_GROUP,
@@ -107,27 +108,27 @@ export class AgentCustomizationItemProvider extends Disposable implements ICusto
 		};
 	}
 
-	private toItem(customization: CustomizationRef, source: AICustomizationSource, sessionCustomization?: SessionCustomization): ICustomizationItem {
-		const clientId = sessionCustomization?.clientId; // set if the configuration came from the client
+	private toItem(customization: CustomizationItemSource, source: AICustomizationSource): ICustomizationItem {
+		const clientId = customization.clientId; // set if the configuration came from the client
 		const badge = this.toBadge(customization, clientId !== undefined);
 		const uri = this.toRemoteUri(customization.uri);
+		const load = customization.load;
 		return {
 			itemKey: customizationItemKey(customization, clientId),
 			uri: uri,
 			type: 'plugin',
-			name: customization.displayName,
-			description: customization.description,
+			name: customization.name,
 			source,
-			status: toStatusString(sessionCustomization?.status),
-			statusMessage: sessionCustomization?.statusMessage,
-			enabled: sessionCustomization?.enabled ?? true,
+			status: toStatusString(load?.kind),
+			statusMessage: load?.kind === CustomizationStatus.Degraded || load?.kind === CustomizationStatus.Error ? load.message : undefined,
+			enabled: customization.enabled,
 			badge: badge.badge,
 			badgeTooltip: badge.badgeTooltip,
 			groupKey: badge.groupKey,
 			extensionId: undefined,
 			pluginUri: uri,
 			userInvocable: undefined,
-			actions: this._getItemActions?.(customization, clientId),
+			actions: customization.type === CustomizationType.Plugin ? this._getItemActions?.(customization as CustomizationRef, clientId) : undefined,
 		};
 	}
 	private _resolveSessionUri(sessionResource: URI): URI {
@@ -143,7 +144,7 @@ export class AgentCustomizationItemProvider extends Disposable implements ICusto
 
 	async provideCustomAgents(sessionResource: URI): Promise<readonly ICustomizationAgentRef[]> {
 		const sessionCustomizations = this.getSessionCustomizations(sessionResource);
-		const agents = sessionCustomizations.flatMap(c => c.agents ?? []);
+		const agents = sessionCustomizations.flatMap(c => c.children?.filter(child => child.type === CustomizationType.Agent) ?? []);
 		return agents.map(agent => ({
 			uri: this.toRemoteUri(agent.uri),
 			name: agent.name,
@@ -163,7 +164,7 @@ export class AgentCustomizationItemProvider extends Disposable implements ICusto
 			items.set(customizationItemKey(customization, undefined), item);
 			const pluginMeta = {
 				item,
-				nonce: customization.nonce,
+				nonce: getNonce(customization),
 				status: undefined,
 				statusMessage: undefined,
 				enabled: undefined,
@@ -174,7 +175,7 @@ export class AgentCustomizationItemProvider extends Disposable implements ICusto
 			expandPromises.push(this._expandPluginContents(pluginMeta, token));
 		}
 		for (const sessionCustomization of this.getSessionCustomizations(sessionResource)) {
-			const isBundleItem = isSyntheticBundle(sessionCustomization.customization);
+			const isBundleItem = isSyntheticBundle(sessionCustomization);
 			const isClientSynced = sessionCustomization.clientId !== undefined;
 			const childGroupKey = isClientSynced ? REMOTE_CLIENT_GROUP : REMOTE_HOST_GROUP;
 
@@ -185,17 +186,18 @@ export class AgentCustomizationItemProvider extends Disposable implements ICusto
 			// expanded below so individual user files appear in per-type tabs.
 			let item: ICustomizationItem;
 			if (!isBundleItem) {
-				item = this.toItem(sessionCustomization.customization, AICustomizationSources.plugin, sessionCustomization);
-				items.set(customizationItemKey(sessionCustomization.customization, sessionCustomization.clientId), item);
+				item = this.toItem(sessionCustomization, AICustomizationSources.plugin);
+				items.set(customizationItemKey(sessionCustomization, sessionCustomization.clientId), item);
 			} else {
 				// create a dummy parent item for the synthetic bundle, it does not go into the items map, just need it to expand.
-				item = { uri: this.toRemoteUri(sessionCustomization.customization.uri), type: 'plugin', source: AICustomizationSources.plugin, name: '', groupKey: childGroupKey, extensionId: undefined, pluginUri: undefined } satisfies ICustomizationItem;
+				item = { uri: this.toRemoteUri(sessionCustomization.uri), type: 'plugin', source: AICustomizationSources.plugin, name: '', groupKey: childGroupKey, extensionId: undefined, pluginUri: undefined } satisfies ICustomizationItem;
 			}
+			const load = sessionCustomization.load;
 			const pluginMeta = {
 				item,
-				nonce: sessionCustomization.customization.nonce,
-				status: toStatusString(sessionCustomization.status),
-				statusMessage: sessionCustomization.statusMessage,
+				nonce: getNonce(sessionCustomization),
+				status: toStatusString(load?.kind),
+				statusMessage: load?.kind === CustomizationStatus.Degraded || load?.kind === CustomizationStatus.Error ? load.message : undefined,
 				enabled: sessionCustomization.enabled,
 				childGroupKey,
 				isBundleItem
@@ -253,14 +255,18 @@ function toStatusString(status: CustomizationStatus | undefined): 'loading' | 'l
 	}
 }
 
-function customizationKey(customization: CustomizationRef): string {
+function customizationKey(customization: { uri: string }): string {
 	return customization.uri;
 }
 
-function customizationItemKey(customization: CustomizationRef, clientId: string | undefined): string {
+function customizationItemKey(customization: { uri: string }, clientId: string | undefined): string {
 	return clientId !== undefined
 		? `${customizationKey(customization)}::${clientId}`
 		: customizationKey(customization);
+}
+
+function getNonce(customization: CustomizationItemSource): string | undefined {
+	return customization.type === CustomizationType.Plugin ? (customization as CustomizationRef).nonce : undefined;
 }
 
 /**
@@ -268,11 +274,10 @@ function customizationItemKey(customization: CustomizationRef, clientId: string 
  * which is an implementation detail of the customization sync pipeline
  * and should not be surfaced as a standalone item in the UI.
  */
-function isSyntheticBundle(customization: CustomizationRef): boolean {
+function isSyntheticBundle(customization: { uri: string }): boolean {
 	try {
 		return URI.parse(customization.uri).scheme === SYNCED_CUSTOMIZATION_SCHEME;
 	} catch {
 		return false;
 	}
 }
-
